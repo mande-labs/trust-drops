@@ -1,6 +1,10 @@
 import React, { useState } from 'react';
 import { MdOutlineLeaderboard, MdOutlineVerifiedUser } from 'react-icons/md';
-import { FaRegUserCircle, FaRegDotCircle } from 'react-icons/fa';
+import {
+  FaRegUserCircle,
+  FaRegDotCircle,
+  FaRegSmileWink,
+} from 'react-icons/fa';
 import { IoLockClosedOutline } from 'react-icons/io5';
 import { TbUserUp } from 'react-icons/tb';
 import { PiCopySimpleBold } from 'react-icons/pi';
@@ -9,6 +13,12 @@ const LeaderBoardModal = ({ closeModal }) => {
   // const [isModalOpen, setModalOpen] = useState(openModal);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
+  const formatAddress = (address) => {
+    const maxLength = 18;
+    return address.length > maxLength
+      ? `${address.substring(0, 6)}...${address.substring(address.length - 4)}`
+      : address;
+  };
 
   // Example dummy data
   const dummyData = Array.from({ length: 50 }, (_, index) => ({
@@ -42,7 +52,7 @@ const LeaderBoardModal = ({ closeModal }) => {
   // if (!isModalOpen) return null;
 
   return (
-    <div className='fixed inset-0 z-20 bg-gray-600 bg-opacity-75 overflow-y-auto h-full w-full flex justify-center items-start pt-20'>
+    <div className='fixed inset-0 z-20 bg-gray-600 bg-opacity-75 overflow-y-auto h-full w-full flex justify-center items-start '>
       <div className=' px-4 sm:px-8 '>
         <div className='py-8'>
           <div className='shadow overflow-hidden rounded border-b border-gray-200'>
@@ -57,6 +67,7 @@ const LeaderBoardModal = ({ closeModal }) => {
                     <FaRegUserCircle className='h-4 mr-2 w-4 inline-block ml-2' />
                     Wallet address
                   </th>
+
                   <th className='text-left py-3 px-4 uppercase font-semibold text-sm'>
                     <MdOutlineVerifiedUser className='h-4 w-4 mr-2 inline-block ml-2' />
                     Credibility score
@@ -78,14 +89,21 @@ const LeaderBoardModal = ({ closeModal }) => {
               <tbody className='text-gray-700'>
                 {currentItems.map((item, index) => (
                   <tr key={index}>
-                    <td className='text-center py-3 px-4'>{item.rank}</td>
-                    <td className='text-left py-3  px-4 flex items-center'>
-                      {item.wallet}
+                    <td className='text-center py-3 px-4 items '>
+                      {item.rank}
+                    </td>
+                    <td className='text-left py-3  px-4 flex  items-center'>
+                      <div className=''>{formatAddress(item.wallet)}</div>
                       <PiCopySimpleBold
-                        className='h-5 w-5 ml-2 text-[#7071E8] cursor-pointer'
+                        className='h-5 w-5 ml-2 mr-3 text-[#7071E8] cursor-pointer'
                         onClick={() => copyToClipboard(item.wallet)}
                       />
+                      <FaRegSmileWink
+                        title='wink this user to request stake'
+                        className='text-center cursor-pointer text-[#7071E8] hover:bg-[#7071E8] rounded-full hover:text-white hover:scale-105 hover:border-2 hover:border-[#7071E8]'
+                      />
                     </td>
+
                     <td className=' py-3 px-4 text-center'>
                       {item.credibilityScore}
                     </td>

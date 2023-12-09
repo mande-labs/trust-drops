@@ -404,7 +404,7 @@ function Dashboard() {
               <div className='description'>claim your credibility rewards</div>
             </div>
             <div className='claimreward-item-container p-2 w-full flex  items-center justify-start gap-4  '>
-              <div className='left-container text-xl bg-white  flex  gap-4  p-2 font-bold border-2 border-[#7071E8]'>
+              <div className='left-container text-xl bg-white  flex  gap-4  p-2 font-bold border-2 items-center border-[#7071E8]'>
                 You have <span className='text-bold text-[#7071E8]'>100</span>
                 $DAO to be claimed
               </div>
