@@ -1,13 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { GiDropletSplash } from 'react-icons/gi';
 import { useNavigate } from 'react-router-dom';
 import LeaderBoardModal from './LeaderBoardModal';
+import { DataContext } from '../context/DataContext';
 const ethers = require('ethers');
 
 function Navbar() {
   const navigate = useNavigate();
   const [account, setAccount] = useState(null);
   const [openModal, setOpenModal] = useState(false);
+
+  const { setAccountAddress } = useContext(DataContext);
 
   const formatAddress = (address) => {
     const maxLength = 14;
@@ -29,6 +32,7 @@ function Navbar() {
         const signer = provider.getSigner();
         const address = await signer.getAddress();
         setAccount(address);
+        setAccountAddress(address);
       } catch (error) {
         console.error(error);
       }
@@ -47,6 +51,7 @@ function Navbar() {
           if (accounts.length > 0) {
             const address = accounts[0];
             setAccount(address);
+            setAccountAddress(address);
           }
         } catch (error) {
           console.error(error);

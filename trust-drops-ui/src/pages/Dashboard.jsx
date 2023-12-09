@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import LeaderBoardModal from '../components/LeaderBoardModal';
 import Navbar from '../components/Navbar';
 import { PiCopySimpleBold } from 'react-icons/pi';
@@ -14,6 +14,37 @@ import {
   LockOpenIcon,
   EyeIcon,
 } from '@heroicons/react/outline';
+
+import {
+  createLightNode,
+  createDecoder,
+  createEncoder,
+  waitForRemotePeer,
+  Protocols,
+} from "@waku/sdk"
+import protobuf from 'protobufjs';
+import { DataContext } from '../context/DataContext';
+
+const ContentTopic = `/trustdrops/debug2/proto`
+const Encoder = createEncoder({ contentTopic: ContentTopic })
+const decoder = createDecoder(ContentTopic)
+
+const WinkContentTopic = `/trustdrops/debug2/wink/proto`
+const WinkEncoder = createEncoder({ contentTopic: WinkContentTopic })
+const WinkDecoder = createDecoder(WinkContentTopic)
+
+// Create a message structure using Protobuf
+const ChatMessage = new protobuf.Type("ChatMessage")
+  .add(new protobuf.Field("timestamp", 1, "uint64"))
+  .add(new protobuf.Field("voter", 2, "string"))
+  .add(new protobuf.Field("votes", 3, "string"))
+  .add(new protobuf.Field("message", 4, "string"))
+  .add(new protobuf.Field("votedTo", 5, "string"));
+
+const WinkChatMessage = new protobuf.Type("ChatMessageWink")
+  .add(new protobuf.Field("timestamp", 1, "uint64"))
+  .add(new protobuf.Field("winker", 2, "string"))
+  .add(new protobuf.Field("winkedTo", 3, "string"));
 
 function Dashboard() {
   const activityData = [
@@ -37,6 +68,24 @@ function Dashboard() {
   const [feedItems, setFeedItems] = useState(activityData);
   const [isStaking, setIsStaking] = useState(true);
   const [activeTab, setActiveTab] = useState('Your Stakes');
+
+  const [stakeForAddress, setStakeForAddress] = useState('');
+  const [stakeAmount, setStakeAmount] = useState('');
+
+  const [waku, setWaku] = useState(undefined)
+  const [wakuStatus, setWakuStatus] = useState("None")
+
+  const [messages, setMessages] = useState([]);
+
+
+  const [voteMessages, setVoteMessages] = useState([])
+  const [winkMessages, setWinkMessages] = useState([])
+
+  const { accountAddress, contract } = useContext(DataContext);
+
+  console.log("accountAddress", accountAddress)
+
+
   const stakesData = [
     {
       address: '0xadfe20xadfe20xadfe20xadfe20xadfe20xadfe20xadfe20xadfe2',
@@ -137,12 +186,47 @@ function Dashboard() {
     }
   };
 
-  const handleStake = () => {
+  const handleStake = async () => {
+    const stakeTx = await contract.stake(stakeForAddress, stakeAmount)
+    await stakeTx.wait()
+
+    console.log('Stake transaction hash', stakeTx.hash)
     console.log('Stake function executed');
+  };
+
+  const checkIfWalletIsConnected = async () => {
+    try {
+      const { ethereum } = window;
+      if (!ethereum) {
+        // setIsLoading(false);
+        console.log('Make sure you have metamask!');
+      } else {
+        console.log('We have the ethereum object', ethereum);
+        const accounts = await ethereum.request({ method: 'eth_accounts' });
+
+        if (accounts.length !== 0) {
+          const account = accounts[0];
+          console.log('Found an authorized account', account);
+          // setCurrentAccount(account);
+        }
+      }
+    } catch (e) {
+      console.log(e);
+    }
+    // setIsLoading(false);
   };
 
   const handleUnstake = () => {
     console.log('Unstake function executed');
+  };
+
+  const handleClaim = async() => {
+    console.log('Claim function executed');
+    const claimTx = await contract.claimTokens()
+
+    await claimTx.wait()
+
+    console.log('Claim transaction hash', claimTx.hash)
   };
 
   const handleTabSwitch = (tabName) => {
@@ -154,6 +238,169 @@ function Dashboard() {
   const closeModal = () => {
     setOpenModal(false);
   };
+
+  function decodeMessage(wakuMessage) {
+    if (!wakuMessage.payload) return
+
+    const {
+      timestamp,
+      voter,
+      votes,
+      message,
+      votedTo
+    } = ChatMessage.decode(
+      wakuMessage.payload
+    )
+
+    if (!timestamp || !voter || !message || !votedTo || !votes) return
+
+    const time = new Date()
+    time.setTime(Number(timestamp))
+
+    // const utf8Text = bytesToUtf8(text);
+
+    return {
+      timestamp: timestamp,
+      message: message,
+      voter: voter,
+      votes: votes,
+      votedTo: votedTo
+    }
+  }
+
+  function decodeWinkMessage(wakuMessage) {
+    if (!wakuMessage.payload) return
+
+    const {
+      timestamp,
+      winker,
+      winkedTo
+    } = WinkChatMessage.decode(
+      wakuMessage.payload
+    )
+
+    if (!timestamp || !winker || !winkedTo) return
+
+    const time = new Date()
+    time.setTime(Number(timestamp))
+
+    // const utf8Text = bytesToUtf8(text);
+
+    return {
+      timestamp: timestamp,
+      winker: winker,
+      winkedTo: winkedTo
+    }
+  }
+
+  // Send the message using Light Push
+  async function sendMessage() {
+    const timestamp = new Date()
+    const time = timestamp.getTime()
+
+    // Encode to protobuf
+    const protoMsg = ChatMessage.create({
+      timestamp: time,
+      voter: accountAddress,
+      message: "inputMessage",
+      votedTo: stakeForAddress,
+      votes: stakeAmount,
+    })
+    const serialisedMessage = ChatMessage.encode(protoMsg).finish()
+
+    // Send the message using Light Push
+    await waku.lightPush.send(Encoder, {
+      payload: serialisedMessage,
+    });
+  }
+
+  async function sendWinkMessage() {
+    const timestamp = new Date()
+    const time = timestamp.getTime()
+
+    // Encode to protobuf
+    const protoMsg = WinkChatMessage.create({
+      timestamp: time,
+      winker: "Anonymous",
+      winkedTo: "Another_Anon",
+    })
+    const serialisedMessage = WinkChatMessage.encode(protoMsg).finish()
+
+    // Send the message using Light Push
+    await waku.lightPush.send(WinkEncoder, {
+      payload: serialisedMessage,
+    });
+  }
+
+
+  useEffect(() => {
+    console.log('Waku setup')
+    if (wakuStatus !== "None") return
+
+    setWakuStatus("Starting")
+    console.log('Waku status', wakuStatus)
+
+    createLightNode({ defaultBootstrap: true }).then((waku) => {
+      waku.start().then(() => {
+        setWaku(waku)
+        setWakuStatus("Connecting")
+      })
+    })
+  }, [waku, wakuStatus])
+
+  useEffect(() => {
+    if (!waku) return
+
+    // We do not handle disconnection/re-connection in this example
+    if (wakuStatus === "Connected") return
+
+    waitForRemotePeer(waku, [
+      Protocols.LightPush,
+      Protocols.Filter,
+      Protocols.Store,
+    ]).then(() => {
+      // We are now connected to a store node
+      setWakuStatus("Connected")
+    })
+  }, [waku, wakuStatus])
+
+  useEffect(() => {
+    if (wakuStatus !== "Connected") return
+    (async () => {
+      const startTime = new Date()
+      // 7 days/week, 24 hours/day, 60min/hour, 60secs/min, 100ms/sec
+      startTime.setTime(startTime.getTime() - 7 * 24 * 60 * 60 * 1000)
+
+      try {
+        for await (const messagesPromises of waku.store.queryGenerator(
+          [decoder],
+          {
+            timeFilter: { startTime, endTime: new Date() },
+            pageDirection: "forward",
+          }
+        )) {
+          const messages = await Promise.all(
+            messagesPromises.map(async (p) => {
+              const msg = await p
+              return decodeMessage(msg)
+            })
+          )
+
+          console.log({ messages })
+          setMessages((currentMessages) => {
+            return currentMessages.concat(messages.filter(Boolean).reverse())
+          })
+        }
+      } catch (e) {
+        console.log("Failed to retrieve messages", e)
+        setWakuStatus("Error Encountered")
+      }
+    })()
+  }, [waku, wakuStatus])
+
+  useEffect(() => {
+    checkIfWalletIsConnected();
+  }, []);
 
   return (
     <div className='  flex flex-col justify-center w-full md:w-screen font-mono'>
@@ -265,6 +512,7 @@ function Dashboard() {
                     type='text'
                     id='address'
                     placeholder='Enter address'
+                    onChange={(e) => setStakeForAddress(e.target.value)}
                     className='p-2 rounded outline-none border-2 border-[#7071E8] bg-white text-black'
                   />
 
@@ -275,6 +523,7 @@ function Dashboard() {
                     type='number'
                     id='quantity'
                     placeholder='Enter quantity'
+                    onChange={(e) => setStakeAmount(e.target.value)}
                     className='p-2 rounded border-2 border-[#7071E8]  bg-white text-black'
                   />
 
@@ -318,21 +567,19 @@ function Dashboard() {
             <div className='flex justify-between mt-5 mb-2'>
               <button
                 onClick={() => handleTabSwitch('Your Stakes')}
-                className={`text-center  flex-1 bg-[#7071E8]  p-2 rounded ${
-                  activeTab === 'Your Stakes'
-                    ? 'text-white'
-                    : 'bg-white border-2 text-[#7071E8] border-[#7071E8] '
-                }`}
+                className={`text-center  flex-1 bg-[#7071E8]  p-2 rounded ${activeTab === 'Your Stakes'
+                  ? 'text-white'
+                  : 'bg-white border-2 text-[#7071E8] border-[#7071E8] '
+                  }`}
               >
                 Your Stakes
               </button>
               <button
                 onClick={() => handleTabSwitch('Stakes Received')}
-                className={`text-center   flex-1 bg-[#7071E8]  p-2 rounded ml-2 ${
-                  activeTab === 'Stakes Received'
-                    ? 'text-white'
-                    : 'bg-white border-2 text-[#7071E8] border-[#7071E8] '
-                }`}
+                className={`text-center   flex-1 bg-[#7071E8]  p-2 rounded ml-2 ${activeTab === 'Stakes Received'
+                  ? 'text-white'
+                  : 'bg-white border-2 text-[#7071E8] border-[#7071E8] '
+                  }`}
               >
                 Stakes Received
               </button>
@@ -408,7 +655,9 @@ function Dashboard() {
                 You have <span className='text-bold text-[#7071E8]'>100</span>
                 $DAO to be claimed
               </div>
-              <button className='right-container text-xl p-2 font-semibold text-white bg-[#7071E8] border-2 border-[#7071E8]'>
+              <button className='right-container text-xl p-2 font-semibold text-white bg-[#7071E8]'
+                onClick={handleClaim}
+              >
                 Claim
               </button>
             </div>

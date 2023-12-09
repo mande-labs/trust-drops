@@ -46,14 +46,14 @@ contract TrustDrops is Ownable {
 
     function verifyAadhaar(uint256[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[34] calldata _pubSignals) external {
         require(alreadyVerified[_pubSignals[0]] == false, "Aadhaar already verified");
-        // bool valid = IAnonAadhaarVerifier(anonAadhaarVerifierAddr).verifyProof(_pA, _pB, _pC, _pubSignals);
-        // if (valid) {
+        bool valid = IAnonAadhaarVerifier(anonAadhaarVerifierAddr).verifyProof(_pA, _pB, _pC, _pubSignals);
+        if (valid) {
             alreadyVerified[_pubSignals[0]] = true;
             alreadyLoggedIn[msg.sender] = true;
             mandToken.transfer(msg.sender, LOGIN_AIRDROP_AMOUNT);
-        // } else {
-            // revert("Invalid aadhaar proof");
-        // }
+        } else {
+            revert("Invalid aadhaar proof");
+        }
     }
 
     function stake(address candidate, uint amount) external {

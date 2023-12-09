@@ -5,6 +5,7 @@ import Dashboard from './pages/Dashboard';
 import VerificationPage from './pages/VerificationPage';
 import { LogInWithAnonAadhaar, useAnonAadhaar } from 'anon-aadhaar-react';
 import { useNavigate } from 'react-router-dom';
+import { DataProvider } from './context/DataContext';
 import { useEffect } from 'react';
 
 function App() {
@@ -22,14 +23,16 @@ function App() {
   }, []);
   return (
     <div className='App '>
-      {/* <Router> */}
-      <Navbar />
-      <Routes>
-        <Route path='/' element={<LandingPage />} />
-        <Route path='/verification' element={<VerificationPage />} />
-        <Route path='/dashboard' element={<Dashboard />} />
-      </Routes>
-      {/* </Router> */}
+      <DataProvider>
+        {/* <Router> */}
+        <Navbar />
+        <Routes>
+          <Route path='/' element={<LandingPage />} />
+          <Route path='/verification' element={<VerificationPage />} />
+          <Route path='/dashboard' element={<Dashboard />} />
+        </Routes>
+        {/* </Router> */}
+      </DataProvider>
     </div>
   );
 }

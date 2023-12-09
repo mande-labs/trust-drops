@@ -1,12 +1,13 @@
 /* global BigInt */
-import React, { useEffect } from 'react';
+import React, { useEffect, useContext } from 'react';
 import { useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
-import crypto from 'crypto';
 import { LogInWithAnonAadhaar, useAnonAadhaar } from 'anon-aadhaar-react';
 import { useNavigate } from 'react-router-dom';
 import { ClipboardCopyIcon, ChevronDownIcon } from '@heroicons/react/outline';
 import { IoFingerPrintOutline } from 'react-icons/io5';
+import { exportCallDataGroth16FromPCD } from "anon-aadhaar-pcd";
+import { DataContext } from '../context/DataContext';
 
 function VerificationPage() {
   const [anonAadhaar] = useAnonAadhaar();
@@ -18,18 +19,55 @@ function VerificationPage() {
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
   });
+
+  const { contract } = useContext(DataContext);
+
+  // useEffect(() => {
+  //   console.log('Anon Aadhaar status: ', anonAadhaar.status);
+  //   if ((anonAadhaar.status = 'logged-in')) {
+  //     navigate('/dashboard');
+  //   }
+  // }, [anonAadhaar]);
+
+  const verifyAadhaarHandler = async (a, b, c, Input) => {
+    try {
+      const estimation = await contract.estimateGas.verifyAadhaar(a, b, c, Input);
+      console.log("check estimation here - ", estimation);
+
+      const verifyTx = await contract.verifyAadhaar(a, b, c, Input, 
+        {
+          gasPrice: estimation, 
+        });
+
+      const verifyReceipt = await verifyTx.wait();
+      console.log(verifyReceipt);
+
+      if (verifyReceipt) {
+        navigate('/dashboard');
+      } else {
+        console.log('Verification failed');
+      }
+    } catch (err) {
+      console.log(err);
+    }
+
+  }
+
   useEffect(() => {
     console.log('Anon Aadhaar status: ', anonAadhaar.status);
-    if ((anonAadhaar.status = 'logged-in')) {
-      navigate('/dashboard');
+    if ((anonAadhaar.status === 'logged-in')) {
+      (async () => {
+        const { a, b, c, Input } = await exportCallDataGroth16FromPCD(
+          anonAadhaar.pcd
+        );
+
+        console.log("check a, b, c and Input below -- ");
+        verifyAadhaarHandler(a, b, c, Input)
+        console.log(a, b, c, Input);
+      })();
     }
   }, [anonAadhaar]);
 
-  const app_id = BigInt(
-    parseInt(crypto.randomBytes(20).toString('hex'), 16)
-  ).toString(); // random value.
-
-  console.log(app_id);
   return (
     <div className='flex flex-col items-center w-screen pt-8 font-mono'>
       <div className='verification-container p-8 w-[90%] bg-[rgba(112,113,232,0.03)]'>
