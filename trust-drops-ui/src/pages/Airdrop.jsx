@@ -20,7 +20,7 @@ function Airdrop() {
   useEffect(() => {
     console.log("search - ", search);
     const query = new URLSearchParams(search);
-    const twitterCode = query.get('twitterAuthCode');
+    const twitterCode = query.get('userId');
     console.log("twitterAuthCode - ", twitterCode);
 
     if (twitterCode) {
@@ -68,7 +68,7 @@ function Airdrop() {
     const payload = {
       "address": await signer.getAddress(),
       "signature": await signer.signMessage("Trustdrops login"),
-      "code": twitterAuthCode
+      "userId": twitterAuthCode
     }
 
     fetch(`${process.env.REACT_APP_API_URL}link-twitter`, {

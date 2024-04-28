@@ -4,11 +4,10 @@ import { IUser } from './user.interface';
 const userSchema = new mongoose.Schema<IUser>({
   address: {
     type: String,
-    required: [true, 'Address is required!'],
     unique: true,
     dropDups: true,
   },
-  signature: { type: String, required: [true, 'Signature is required!'] },
+  signature: { type: String },
   twitterId: {
     type: String,
     required: [true, 'Twitter is required!'],

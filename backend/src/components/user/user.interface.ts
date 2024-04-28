@@ -7,6 +7,6 @@ export interface IUser {
 }
 
 export interface IUpdateUser {
-  twitterId?: string;
-  approved?: boolean;
+  address: string;
+  signature: string;
 }

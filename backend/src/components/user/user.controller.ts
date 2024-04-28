@@ -3,16 +3,18 @@ import httpStatus from 'http-status';
 import {
   create,
   read,
+  readByTwitterId,
+  readById,
   update,
   isSignatureValid,
   queueApproval,
   authClient
 } from '@components/user/user.service';
 import { Client, auth } from 'twitter-api-sdk';
-import { IUser } from '@components/user/user.interface';
+import { IUser, IUpdateUser } from '@components/user/user.interface';
 import config from '@config/config';
 const STATE = 'trustdrops';
-const CODE_CHALLENGE= 'a543d136-2cc0-4651-b571-e972bf116556';
+const CODE_CHALLENGE= 'challenge';
 
 const readUser = async (req: Request, res: Response) => {
   res.status(httpStatus.OK);
@@ -31,7 +33,39 @@ const getUserOauthUrl = async (req: Request, res: Response) => {
 const twitterCallback = async (req: Request, res: Response) => {
   const { code, state } = req.query;
   if (state !== STATE) return res.status(500).send("State isn't matching");
-  res.redirect(`${config.uiEndpoint}/airdrop?twitterAuthCode=${code}`);
+
+  const authClientLocal = new auth.OAuth2User({
+    client_id: config.twitterClientId as string,
+    client_secret: config.twitterClientSecret as string,
+    callback: `${config.baseApiUrl}callback`,
+    scopes: ['tweet.read', 'users.read'],
+  });
+  authClientLocal.generateAuthURL({
+    state: STATE,
+    code_challenge_method: 'plain',
+    code_challenge: CODE_CHALLENGE
+  });
+  await authClientLocal.requestAccessToken(code as string);
+  const twitterClientLocal = new Client(authClientLocal);
+  const userData = await twitterClientLocal.users.findMyUser();
+  console.log('userData - ', userData);
+
+  const user = {
+    twitterId: userData.data.id,
+  } as IUser;
+  let createdUser;
+  const dbUser = await readByTwitterId(userData.data.id);
+  try {
+    if (!dbUser) {
+      createdUser = await create(user);
+    } else {
+      createdUser = dbUser;
+    }
+  } catch (err) {
+    res.status(httpStatus.BAD_REQUEST).send({ message: 'Twitter auth failed, please try again!' });
+    return;
+  }
+  res.redirect(`${config.uiEndpoint}/airdrop?userId=${createdUser.id}`);
 };
 
 const queueTest = async (req: Request, res: Response) => {
@@ -46,54 +80,40 @@ const queueTest = async (req: Request, res: Response) => {
 };
 
 const linkUserTwitter = async (req: Request, res: Response) => {
-  try {
-    const { code, address, signature } = req.body;
+  // try {
+    const { userId, address, signature } = req.body;
+    console.log(req.body);
 
     if (!isSignatureValid(address as string, signature as string)) {
       return res.send({ error: 'Signature invalid!' });
     }
 
-    const authClientLocal = new auth.OAuth2User({
-      client_id: config.twitterClientId as string,
-      client_secret: config.twitterClientSecret as string,
-      callback: `${config.baseApiUrl}callback`,
-      scopes: ['tweet.read', 'users.read'],
-    });
-    authClientLocal.generateAuthURL({
-      state: STATE,
-      code_challenge_method: 'plain',
-      code_challenge: CODE_CHALLENGE
-    });
-    await authClientLocal.requestAccessToken(code as string);
-    const twitterClientLocal = new Client(authClientLocal);
-    const userData = await twitterClientLocal.users.findMyUser();
-    console.log('userData - ', userData);
+    const user = await readById(userId);
 
-    const user = {
-      address,
-      signature,
-      twitterId: userData.data.id,
-    } as IUser;
-    const dbUser = await read(address);
-    try {
-      if (dbUser) {
-        await update(dbUser, {twitterId: userData.data.id})
-      } else {
-        await create(user);
-      }
-      queueApproval(user);
-    } catch (err) {
-      res.status(httpStatus.BAD_REQUEST).send({ message: 'Twitter already linked to some other wallet' });
+    if (!user) {
+      res.status(httpStatus.BAD_REQUEST).send({ message: 'Invalid request , please try again!' });
       return;
     }
+
+    // try {
+      if (user.approved) {
+        res.status(httpStatus.BAD_REQUEST).send({ message: 'Twitter already linked to some other account!' });
+      }
+    
+      await update(user, {address, signature} as IUpdateUser);
+      queueApproval(user);
+    // } catch (err) {
+    //   res.status(httpStatus.BAD_REQUEST).send({ message: 'Could not link, please try again!' });
+    //   return;
+    // }
 
 
     res.status(httpStatus.OK);
     res.send({ message: 'Linked' });
-  } catch (error) {
-    console.log(error);
-    res.send({ error });
-  }
+  // } catch (error) {
+  //   console.log(error);
+  //   res.send({ error });
+  // }
 };
 
 export {

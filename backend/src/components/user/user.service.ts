@@ -16,15 +16,27 @@ const authClient = new auth.OAuth2User({
 });
 const twitterClient = new Client(authClient);
 
-const create = async (user: IUser): Promise<boolean> => {
+const create = async (user: IUser): Promise<IUser> => {
   try {
     const newUser = await UserModel.create(user);
     logger.debug(`User created: %O`, newUser);
-    return true;
+    return newUser;
   } catch (err) {
     logger.error(`User create err: %O`, err.message);
     throw new AppError(httpStatus.BAD_REQUEST, 'User was not created!');
   }
+};
+
+const readById = async (id: string): Promise<IUser> => {
+  logger.debug(`Sent user.id ${id}`);
+  const user = await UserModel.findById(id);
+  return user as IUser;
+};
+
+const readByTwitterId = async (address: string): Promise<IUser> => {
+  logger.debug(`Sent user.id ${address}`);
+  const user = await UserModel.findOne({ twitterId: address });
+  return user as IUser;
 };
 
 const read = async (address: string): Promise<IUser> => {
@@ -78,6 +90,8 @@ const queueApproval = async (user: IUser) => {
 export {
   create,
   read,
+  readByTwitterId,
+  readById,
   update,
   authClient,
   twitterClient,
