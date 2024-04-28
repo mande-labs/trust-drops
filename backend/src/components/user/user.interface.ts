@@ -9,4 +9,5 @@ export interface IUser {
 export interface IUpdateUser {
   address: string;
   signature: string;
+  approved?: boolean;
 }
