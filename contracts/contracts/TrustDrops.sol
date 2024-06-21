@@ -186,11 +186,12 @@ contract TrustDrops is Ownable {
             uint userCred = rewardDetails.userWeeklyCred[_user][week];
             uint weekTotalCred = rewardDetails.weeklyTotalCred[week];
             uint weekTotalRewards = rewardDetails.weeklyTotalRewards[week];
-            
+
             // Use fallback values if there is no data for the current week
-            if (userCred == 0 && rewardDetails.userLastUpdatedWeek[_user] <= week) {
-                userCred = rewardDetails.lastUserCred[_user];
+            if (userCred == 0) {
+                userCred = findLastUserCred(week, _user);
             }
+            //suggestion: maybe should return 0 or exception if weekTotalCred is 0
             if (weekTotalCred == 0 && rewardDetails.lastUpdatedWeek <= week) {
                 weekTotalCred = rewardDetails.lastWeeklyTotalCred;
             }
@@ -231,7 +232,7 @@ contract TrustDrops is Ownable {
         // Update the userWeeklyCred for weeks that haven't been updated
         for (uint week = rewardDetails.userLastUpdatedWeek[_user] + 1; week <= currentWeek; week++) {
             if (rewardDetails.userWeeklyCred[_user][week] == 0) {
-                rewardDetails.userWeeklyCred[_user][week] = rewardDetails.lastUserCred[_user];
+                rewardDetails.userWeeklyCred[_user][week] = findLastUserCred(week, _user);
             }
         }
         rewardDetails.userLastUpdatedWeek[_user] = currentWeek;
@@ -253,5 +254,17 @@ contract TrustDrops is Ownable {
         rewardDetails.lastUserCred[_user] = rewardDetails.userWeeklyCred[_user][currentWeek];
     }
 
+    function findLastUserCred(uint endWeek, address _user) {
+        for (uint week = endWeek; week >= 1; week--) {
+            uint userCred = rewardDetails.userWeeklyCred[_user][week];
+
+            if(userCred > 0) {
+                return userCred;
+            }
+        }
+
+        return 0;
+    }
+    
     receive() external payable {}
 }
